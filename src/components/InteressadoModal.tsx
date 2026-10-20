@@ -8,8 +8,20 @@ interface InteressadoModalProps {
   activeLead: Lead | null;
   currentUser: UserProfile;
   users: UserProfile[];
-  onSave: (lead: Lead) => void;
+  onSave: (lead: Lead) => void | Promise<void>;
   onShowMessage: (text: string, type: "success" | "error" | "info") => void;
+}
+
+// Extrai uma mensagem legível dos erros do Firestore (que vêm em JSON)
+export function extrairMensagemErro(err: any, padrao: string): string {
+  const raw = err?.message || "";
+  if (raw.includes("permission-denied") || raw.includes("insufficient permissions")) {
+    return "Sem permissão para salvar. Verifique se você está logado e se as regras do Firestore foram publicadas.";
+  }
+  if (raw.includes("unavailable") || raw.includes("offline")) {
+    return "Sem conexão com o Firebase. Verifique sua internet e tente novamente.";
+  }
+  return padrao;
 }
 
 const ORIGINS: LeadOrigin[] = [
@@ -49,6 +61,7 @@ export default function InteressadoModal({
   const [dataContato, setDataContato] = useState(new Date().toISOString().slice(0, 10));
   const [responsavelId, setResponsavelId] = useState(currentUser.id);
   const [observacoes, setObservacoes] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -76,7 +89,7 @@ export default function InteressadoModal({
 
   if (!isOpen) return null;
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
     if (!nome.trim()) {
@@ -110,8 +123,18 @@ export default function InteressadoModal({
       estudanteId: activeLead?.estudanteId,
     };
 
-    onSave(leadData);
-    onClose();
+    if (isSaving) return;
+    setIsSaving(true);
+    try {
+      await onSave(leadData);
+      onClose();
+    } catch (err: any) {
+      // Não fecha o modal: o usuário precisa ver que deu erro e tentar de novo
+      console.error("Erro ao salvar interessado:", err);
+      onShowMessage(extrairMensagemErro(err, "Não foi possível salvar o interessado."), "error");
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   return (
@@ -280,9 +303,10 @@ export default function InteressadoModal({
             </button>
             <button
               type="submit"
-              className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition-smooth shadow-sm text-xs"
+              disabled={isSaving}
+              className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition-smooth shadow-sm text-xs disabled:opacity-60"
             >
-              {activeLead ? "Salvar Alterações" : "Registrar Interessado"}
+              {isSaving ? "Salvando..." : activeLead ? "Salvar Alterações" : "Registrar Interessado"}
             </button>
           </div>
         </form>

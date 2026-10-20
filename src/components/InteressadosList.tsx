@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Lead, LeadStatus, StudySeries, UserProfile } from "../types";
 import { getWhatsAppUrl } from "../services/whatsapp";
 import { FirestoreService } from "../services/firestoreService";
+import { extrairMensagemErro } from "./InteressadoModal";
 import { 
   Search, 
   Plus, 
@@ -95,8 +96,14 @@ export default function InteressadosList({
       status: newStatus,
       atualizadoEm: new Date().toISOString(),
     };
-    await FirestoreService.saveLead(updatedLead);
-    onShowMessage(`Status de "${lead.nome}" atualizado para: ${newStatus}`, "success");
+    try {
+      await FirestoreService.saveLead(updatedLead);
+      onShowMessage(`Status de "${lead.nome}" atualizado para: ${newStatus}`, "success");
+    } catch (err: any) {
+      console.error("Erro ao atualizar status:", err);
+      onShowMessage(extrairMensagemErro(err, "Não foi possível atualizar o status no Firebase."), "error");
+      return;
+    }
 
     if (newStatus === "Estudo aceito" && !lead.convertidoParaEstudo) {
       setConvertingLead(updatedLead);
@@ -109,8 +116,13 @@ export default function InteressadosList({
     const confirmed = window.confirm(`Deseja remover o interessado "${lead.nome}" do registro?`);
     if (!confirmed) return;
 
-    await FirestoreService.deleteLead(lead.id);
-    onShowMessage(`Interessado "${lead.nome}" removido do Firebase.`, "success");
+    try {
+      await FirestoreService.deleteLead(lead.id);
+      onShowMessage(`Interessado "${lead.nome}" removido do Firebase.`, "success");
+    } catch (err: any) {
+      console.error("Erro ao excluir interessado:", err);
+      onShowMessage(extrairMensagemErro(err, "Não foi possível excluir o interessado."), "error");
+    }
   }
 
   // Confirm conversion to student
@@ -124,10 +136,15 @@ export default function InteressadosList({
       return { id, nome: u ? u.nome : "Instrutor" };
     });
 
-    await FirestoreService.convertLeadToStudent(lead, serie, resolvedInstructors, currentUser);
-    onShowMessage(`Sucesso! ${lead.nome} agora é um Estudante da Bíblia na série "${serie.nome}".`, "success");
-    if (onNavigateToStudents) {
-      onNavigateToStudents();
+    try {
+      await FirestoreService.convertLeadToStudent(lead, serie, resolvedInstructors, currentUser);
+      onShowMessage(`Sucesso! ${lead.nome} agora é um Estudante da Bíblia na série "${serie.nome}".`, "success");
+      if (onNavigateToStudents) {
+        onNavigateToStudents();
+      }
+    } catch (err: any) {
+      console.error("Erro ao converter interessado:", err);
+      onShowMessage(extrairMensagemErro(err, "Não foi possível converter o interessado em estudante."), "error");
     }
   }
 

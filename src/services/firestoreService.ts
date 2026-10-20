@@ -45,6 +45,13 @@ const INITIAL_SERIES: Omit<StudySeries, "id">[] = [
   },
 ];
 
+// IDs temporários gerados no cliente (ex: "lead_1234567890") não são documentos
+// reais no Firestore. Nesses casos devemos criar (addDoc), não atualizar.
+export function isTemporaryId(id?: string): boolean {
+  if (!id) return true;
+  return /^(lead|std|usr|ser)_\d+$/.test(id);
+}
+
 export const FirestoreService = {
   // --- SERIES ---
   async seedInitialSeriesIfEmpty(): Promise<void> {
@@ -83,8 +90,8 @@ export const FirestoreService = {
 
   async saveSeries(item: Partial<StudySeries> & { nome: string; totalEstudos: number }): Promise<void> {
     try {
-      if (item.id) {
-        await updateDoc(doc(db, "series", item.id), {
+      if (!isTemporaryId(item.id)) {
+        await updateDoc(doc(db, "series", item.id as string), {
           nome: item.nome,
           totalEstudos: item.totalEstudos,
           atualizadoEm: new Date().toISOString(),
@@ -129,6 +136,8 @@ export const FirestoreService = {
     );
   },
 
+  // IDs temporários gerados no cliente (ex: "lead_1234567890") não são documentos
+  // reais no Firestore. Nesses casos devemos criar (addDoc), não atualizar.
   async saveLead(lead: Partial<Lead> & { nome: string; whatsapp: string }): Promise<string> {
     try {
       const data = {
@@ -148,13 +157,13 @@ export const FirestoreService = {
         estudanteId: lead.estudanteId || "",
       };
 
-      if (lead.id) {
-        await updateDoc(doc(db, "interessados", lead.id), data);
-        return lead.id;
+      if (!isTemporaryId(lead.id)) {
+        await updateDoc(doc(db, "interessados", lead.id as string), data);
+        return lead.id as string;
       } else {
         const ref = await addDoc(collection(db, "interessados"), {
           ...data,
-          criadoEm: new Date().toISOString(),
+          criadoEm: lead.criadoEm || new Date().toISOString(),
         });
         return ref.id;
       }
@@ -215,16 +224,16 @@ export const FirestoreService = {
         leadIdOrigem: student.leadIdOrigem || "",
       };
 
-      if (student.id) {
-        await updateDoc(doc(db, "estudantes", student.id), data);
-        return student.id;
+      if (!isTemporaryId(student.id)) {
+        await updateDoc(doc(db, "estudantes", student.id as string), data);
+        return student.id as string;
       } else {
         const ref = await addDoc(collection(db, "estudantes"), {
           ...data,
           criadoPorId: student.criadoPorId || "",
           criadoPorNome: student.criadoPorNome || "",
           criadoPorPerfil: student.criadoPorPerfil || "",
-          criadoEm: new Date().toISOString(),
+          criadoEm: student.criadoEm || new Date().toISOString(),
         });
         return ref.id;
       }
@@ -420,8 +429,8 @@ export const FirestoreService = {
         atualizadoEm: new Date().toISOString(),
       };
 
-      if (user.id) {
-        await updateDoc(doc(db, "usuarios", user.id), data);
+      if (!isTemporaryId(user.id)) {
+        await updateDoc(doc(db, "usuarios", user.id as string), data);
       } else {
         await addDoc(collection(db, "usuarios"), {
           ...data,

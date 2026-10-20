@@ -53,12 +53,17 @@ service cloud.firestore {
     // O admin também pode cadastrar instrutores com ID automático.
     match /usuarios/{userId} {
       allow read: if isSignedIn();
-      // Bootstrap do próprio perfil após o login (sem poder se auto-promover a admin)
+      // Bootstrap do próprio perfil após o login (sem poder se auto-promover a admin).
+      // Exceção: o e-mail do administrador principal pode criar o próprio perfil já
+      // como admin — é o primeiro acesso do sistema.
       allow create: if isAdmin()
         || (isSignedIn()
             && request.auth.uid == userId
-            && incoming().perfil != 'admin'
-            && incoming().ativo == true);
+            && incoming().ativo == true
+            && (
+              incoming().perfil != 'admin'
+              || request.auth.token.email == 'rickyjorgecastro@gmail.com'
+            ));
       // O usuário pode editar o próprio perfil, mas nunca trocar o próprio perfil/ativo;
       // o admin pode editar qualquer usuário.
       allow update: if isAdmin()

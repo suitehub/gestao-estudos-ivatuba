@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { UserProfile, UserRole } from "../types";
 import { FirestoreService, DISTRITO_FIXO, IGREJA_FIXA, IGREJA_ID_FIXA } from "../services/firestoreService";
+import { extrairMensagemErro } from "./InteressadoModal";
 import { Users, UserPlus, Edit, Trash2, MapPin } from "lucide-react";
 
 interface UsuariosProps {
@@ -49,10 +50,15 @@ export default function Usuarios({
     const confirmed = window.confirm(`Deseja remover o usuário "${target.nome}" de Ivatuba?`);
     if (!confirmed) return;
 
-    await FirestoreService.deleteUser(target.id);
-    onShowMessage(`Usuário "${target.nome}" removido do Firebase.`, "success");
-    if (editingUserId === target.id) {
-      handleReset();
+    try {
+      await FirestoreService.deleteUser(target.id);
+      onShowMessage(`Usuário "${target.nome}" removido do Firebase.`, "success");
+      if (editingUserId === target.id) {
+        handleReset();
+      }
+    } catch (err: any) {
+      console.error("Erro ao remover usuário:", err);
+      onShowMessage(extrairMensagemErro(err, "Não foi possível remover o usuário."), "error");
     }
   }
 
@@ -87,12 +93,17 @@ export default function Usuarios({
       atualizadoEm: new Date().toISOString(),
     };
 
-    await FirestoreService.saveUser(userData);
-    onShowMessage(
-      editingUserId ? "Usuário atualizado com sucesso no Firebase!" : "Novo usuário cadastrado com sucesso em Ivatuba no Firebase!",
-      "success"
-    );
-    handleReset();
+    try {
+      await FirestoreService.saveUser(userData);
+      onShowMessage(
+        editingUserId ? "Usuário atualizado com sucesso no Firebase!" : "Novo usuário cadastrado com sucesso em Ivatuba no Firebase!",
+        "success"
+      );
+      handleReset();
+    } catch (err: any) {
+      console.error("Erro ao salvar usuário:", err);
+      onShowMessage(extrairMensagemErro(err, "Não foi possível salvar o usuário."), "error");
+    }
   }
 
   return (

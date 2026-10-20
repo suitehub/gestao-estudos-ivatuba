@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { StudySeries, Student } from "../types";
 import { FirestoreService } from "../services/firestoreService";
+import { extrairMensagemErro } from "./InteressadoModal";
 import { BookOpen, Plus, Edit, Trash2, Library } from "lucide-react";
 
 interface CatalogoProps {
@@ -39,12 +40,17 @@ export default function Catalogo({
       return;
     }
 
-    await FirestoreService.saveSeries({
-      ...item,
-      nome: novoNome.trim(),
-      totalEstudos: novoTotal,
-    });
-    onShowMessage(`Série "${novoNome}" atualizada com sucesso no Firebase!`, "success");
+    try {
+      await FirestoreService.saveSeries({
+        ...item,
+        nome: novoNome.trim(),
+        totalEstudos: novoTotal,
+      });
+      onShowMessage(`Série "${novoNome}" atualizada com sucesso no Firebase!`, "success");
+    } catch (err: any) {
+      console.error("Erro ao atualizar série:", err);
+      onShowMessage(extrairMensagemErro(err, "Não foi possível atualizar a série. Somente administradores podem editar o catálogo."), "error");
+    }
   }
 
   async function handleDelete(item: StudySeries) {
@@ -60,8 +66,13 @@ export default function Catalogo({
     const confirmed = window.confirm(`Deseja excluir a série "${item.nome}" do catálogo?`);
     if (!confirmed) return;
 
-    await FirestoreService.deleteSeries(item.id);
-    onShowMessage(`Série "${item.nome}" removida do catálogo no Firebase.`, "success");
+    try {
+      await FirestoreService.deleteSeries(item.id);
+      onShowMessage(`Série "${item.nome}" removida do catálogo no Firebase.`, "success");
+    } catch (err: any) {
+      console.error("Erro ao remover série:", err);
+      onShowMessage(extrairMensagemErro(err, "Não foi possível remover a série. Somente administradores podem editar o catálogo."), "error");
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -78,14 +89,19 @@ export default function Catalogo({
       return;
     }
 
-    await FirestoreService.saveSeries({
-      nome: nome.trim(),
-      totalEstudos: total,
-    });
+    try {
+      await FirestoreService.saveSeries({
+        nome: nome.trim(),
+        totalEstudos: total,
+      });
 
-    onShowMessage(`Nova série "${nome}" adicionada com sucesso no Firebase!`, "success");
-    setNome("");
-    setTotalEstudos("");
+      onShowMessage(`Nova série "${nome}" adicionada com sucesso no Firebase!`, "success");
+      setNome("");
+      setTotalEstudos("");
+    } catch (err: any) {
+      console.error("Erro ao criar série:", err);
+      onShowMessage(extrairMensagemErro(err, "Não foi possível criar a série. Somente administradores podem editar o catálogo."), "error");
+    }
   }
 
   return (

@@ -14,7 +14,7 @@ import Instrutores from "./components/Instrutores";
 import Usuarios from "./components/Usuarios";
 import Catalogo from "./components/Catalogo";
 import AuthScreen from "./components/AuthScreen";
-import InteressadoModal from "./components/InteressadoModal";
+import InteressadoModal, { extrairMensagemErro } from "./components/InteressadoModal";
 import EstudanteModal from "./components/EstudanteModal";
 
 import { motion, AnimatePresence } from "motion/react";
@@ -115,8 +115,13 @@ export default function App() {
     const student = students.find((s) => s.id === studentId);
     if (!student) return;
 
-    await FirestoreService.advanceStudentStudy(student);
-    handleShowNotification(`Estudo para "${student.nome}" avançou lição!`, "success");
+    try {
+      await FirestoreService.advanceStudentStudy(student);
+      handleShowNotification(`Estudo para "${student.nome}" avançou lição!`, "success");
+    } catch (err: any) {
+      console.error("Erro ao avançar estudo:", err);
+      handleShowNotification(extrairMensagemErro(err, "Não foi possível avançar a lição."), "error");
+    }
   }
 
   // Student Delete
@@ -127,8 +132,13 @@ export default function App() {
     const confirmed = window.confirm(`Deseja excluir o estudante "${student.nome}" permanentemente?`);
     if (!confirmed) return;
 
-    await FirestoreService.deleteStudent(studentId);
-    handleShowNotification(`Estudante "${student.nome}" removido.`, "success");
+    try {
+      await FirestoreService.deleteStudent(studentId);
+      handleShowNotification(`Estudante "${student.nome}" removido.`, "success");
+    } catch (err: any) {
+      console.error("Erro ao excluir estudante:", err);
+      handleShowNotification(extrairMensagemErro(err, "Não foi possível excluir o estudante."), "error");
+    }
   }
 
   // Presets handlers

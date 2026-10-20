@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Student, StudentStatus, StudySeries, UserProfile, InstructorRef } from "../types";
 import { X, BookOpen, Plus, Trash2 } from "lucide-react";
 import { DISTRITO_FIXO, IGREJA_FIXA, IGREJA_ID_FIXA } from "../services/firestoreService";
+import { extrairMensagemErro } from "./InteressadoModal";
 
 interface EstudanteModalProps {
   isOpen: boolean;
@@ -10,7 +11,7 @@ interface EstudanteModalProps {
   currentUser: UserProfile;
   series: StudySeries[];
   users: UserProfile[];
-  onSave: (student: Student) => void;
+  onSave: (student: Student) => void | Promise<void>;
   onShowMessage: (text: string, type: "success" | "error" | "info") => void;
 }
 
@@ -44,6 +45,7 @@ export default function EstudanteModal({
   const [ultimoContato, setUltimoContato] = useState(new Date().toISOString().slice(0, 10));
   const [observacoes, setObservacoes] = useState("");
   const [instrutorIds, setInstrutorIds] = useState<string[]>([currentUser.id]);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -101,7 +103,7 @@ export default function EstudanteModal({
     setInstrutorIds(next);
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
     if (!nome.trim()) {
@@ -152,8 +154,17 @@ export default function EstudanteModal({
       leadIdOrigem: activeStudent?.leadIdOrigem,
     };
 
-    onSave(studentData);
-    onClose();
+    if (isSaving) return;
+    setIsSaving(true);
+    try {
+      await onSave(studentData);
+      onClose();
+    } catch (err: any) {
+      console.error("Erro ao salvar estudante:", err);
+      onShowMessage(extrairMensagemErro(err, "Não foi possível salvar o estudante."), "error");
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   return (
@@ -393,9 +404,10 @@ export default function EstudanteModal({
             </button>
             <button
               type="submit"
-              className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition-smooth shadow-sm text-xs"
+              disabled={isSaving}
+              className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition-smooth shadow-sm text-xs disabled:opacity-60"
             >
-              {activeStudent ? "Salvar Alterações" : "Cadastrar Estudante"}
+              {isSaving ? "Salvando..." : activeStudent ? "Salvar Alterações" : "Cadastrar Estudante"}
             </button>
           </div>
 
