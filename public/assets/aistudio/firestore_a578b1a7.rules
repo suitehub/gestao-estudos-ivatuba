@@ -1,0 +1,187 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default global deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Security & Data Payload Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128;
+    }
+
+    function isValidString(val, maxLen) {
+      return val is string && val.size() <= maxLen;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data;
+    }
+
+    function getUserRole() {
+      return getUserData().perfil;
+    }
+
+    function getUserChurch() {
+      return getUserData().igrejaId;
+    }
+
+    function hasUserProfile() {
+      return isSignedIn() && exists(/databases/$(database)/documents/usuarios/$(request.auth.uid));
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'rickyjorgecastro@gmail.com' ||
+        (hasUserProfile() && getUserRole() == 'admin')
+      );
+    }
+
+    function isDistrital() {
+      return isSignedIn() && (
+        isAdmin() ||
+        (hasUserProfile() && getUserRole() == 'distrital')
+      );
+    }
+
+    function isLocal() {
+      return isSignedIn() && hasUserProfile() && getUserRole() == 'local';
+    }
+
+    function isMembro() {
+      return isSignedIn() && hasUserProfile() && getUserRole() == 'membro';
+    }
+
+    function isSameChurch(churchId) {
+      return hasUserProfile() && getUserChurch() == churchId;
+    }
+
+    // --- locais (Igrejas e Grupos do Distrito) ---
+    match /locais/{localId} {
+      allow read: if true; // Public for login church selector and district guests
+      allow create, update: if isSignedIn() && (isAdmin() || isDistrital()) && isValidString(request.resource.data.nome, 100);
+      allow delete: if isSignedIn() && (isAdmin() || isDistrital());
+    }
+
+    // --- series (Catálogo de Lições Bíblicas) ---
+    match /series/{serieId} {
+      allow read: if true; // Public for lesson browser
+      allow create, update: if isSignedIn() && (isAdmin() || isDistrital()) && isValidString(request.resource.data.nome, 100);
+      allow delete: if isSignedIn() && (isAdmin() || isDistrital());
+    }
+
+    // --- usuarios (Perfis e Credenciais) ---
+    match /usuarios/{userId} {
+      // Read access
+      allow read: if isSignedIn() && (
+        request.auth.uid == userId ||
+        isAdmin() ||
+        isDistrital() ||
+        (isLocal() && isSameChurch(resource.data.igrejaId))
+      );
+
+      // Create access
+      allow create: if isSignedIn() && (
+        // Master admin bootstrapping or full admin
+        (request.auth.token.email == 'rickyjorgecastro@gmail.com' && request.auth.uid == userId) ||
+        isAdmin() ||
+        isDistrital() ||
+        (isLocal() && isSameChurch(request.resource.data.igrejaId) && (request.resource.data.perfil in ['local', 'membro']))
+      ) && isValidString(request.resource.data.nome, 100);
+
+      // Update access - strictly prevent self-privilege escalation
+      allow update: if isSignedIn() && (
+        isAdmin() ||
+        isDistrital() ||
+        // Self update: Can update name, etc., but CANNOT elevate role, change church, or deactivate
+        (request.auth.uid == userId && 
+          request.resource.data.perfil == resource.data.perfil &&
+          request.resource.data.igrejaId == resource.data.igrejaId &&
+          request.resource.data.ativo == resource.data.ativo &&
+          request.resource.data.emailAuth == resource.data.emailAuth
+        ) ||
+        // Local leader update: Can only update members of their same church, cannot elevate to admin/distrital
+        (isLocal() && 
+          isSameChurch(resource.data.igrejaId) && 
+          isSameChurch(request.resource.data.igrejaId) && 
+          (resource.data.perfil in ['local', 'membro']) &&
+          (request.resource.data.perfil in ['local', 'membro'])
+        )
+      ) && isValidString(request.resource.data.nome, 100);
+
+      // Delete access
+      allow delete: if isSignedIn() && (isAdmin() || isDistrital());
+    }
+
+    // --- login_index (Índice de login por usuário e congregação) ---
+    match /login_index/{loginId} {
+      allow read: if true; // Required pre-auth lookup for username-based login resolution
+      
+      allow create: if isSignedIn() && (
+        isAdmin() ||
+        isDistrital() ||
+        (isLocal() && isSameChurch(request.resource.data.igrejaId) && (request.resource.data.perfil in ['local', 'membro']))
+      );
+
+      allow update, delete: if isSignedIn() && (
+        isAdmin() ||
+        isDistrital() ||
+        (isLocal() && isSameChurch(resource.data.igrejaId) && isSameChurch(request.resource.data.igrejaId) && (resource.data.perfil in ['local', 'membro']))
+      );
+    }
+
+    // --- interessados (Alunos e Estudos Bíblicos) ---
+    match /interessados/{interessadoId} {
+      // Read: Admin and distrital see all; local leader sees church; membro sees own or assigned
+      allow read: if isSignedIn() && (
+        isAdmin() ||
+        isDistrital() ||
+        (isLocal() && isSameChurch(resource.data.igrejaId)) ||
+        (isMembro() && (
+          resource.data.criadoPorId == request.auth.uid ||
+          (resource.data.instrutorIds != null && request.auth.uid in resource.data.instrutorIds)
+        ))
+      );
+
+      // Create: Creator identity and church bounds enforced
+      allow create: if isSignedIn() && (
+        isAdmin() ||
+        isDistrital() ||
+        (isLocal() && isSameChurch(request.resource.data.igrejaId)) ||
+        (isMembro() && 
+          request.resource.data.criadoPorId == request.auth.uid && 
+          isSameChurch(request.resource.data.igrejaId)
+        )
+      ) && isValidString(request.resource.data.nome, 100);
+
+      // Update: Prevent tampering with owner or church attributes by members
+      allow update: if isSignedIn() && (
+        isAdmin() ||
+        isDistrital() ||
+        (isLocal() && 
+          isSameChurch(resource.data.igrejaId) && 
+          isSameChurch(request.resource.data.igrejaId)
+        ) ||
+        (isMembro() && (
+          (resource.data.criadoPorId == request.auth.uid || 
+           (resource.data.instrutorIds != null && request.auth.uid in resource.data.instrutorIds)) &&
+          request.resource.data.criadoPorId == resource.data.criadoPorId &&
+          request.resource.data.igrejaId == resource.data.igrejaId
+        ))
+      ) && isValidString(request.resource.data.nome, 100);
+
+      // Delete: Only admin, distrital, and local leader within same church
+      allow delete: if isSignedIn() && (
+        isAdmin() ||
+        isDistrital() ||
+        (isLocal() && isSameChurch(resource.data.igrejaId))
+      );
+    }
+  }
+}

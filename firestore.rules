@@ -1,0 +1,93 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default global deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helper functions ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'rickyjorgecastro@gmail.com' ||
+        (exists(/databases/$(database)/documents/usuarios/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.perfil == 'admin')
+      );
+    }
+
+    function isValidString(value, maxSize) {
+      return value is string && value.size() > 0 && value.size() <= maxSize;
+    }
+
+    function isValidLessonCount(value) {
+      return value is number && value >= 1 && value <= 1000;
+    }
+
+    // --- series (Catálogo de Lições Bíblicas) ---
+    match /series/{seriesId} {
+      allow read: if isSignedIn();
+      allow create: if isAdmin()
+        && isValidString(incoming().nome, 150)
+        && isValidLessonCount(incoming().totalEstudos);
+      allow update: if isAdmin()
+        && isValidString(incoming().nome, 150)
+        && isValidLessonCount(incoming().totalEstudos);
+      allow delete: if isAdmin();
+    }
+
+    // --- usuarios (Perfis e Credenciais de Instrutores) ---
+    // Doc ID normalmente é o UID do Firebase Auth (perfis criados no login).
+    // O admin também pode cadastrar instrutores com ID automático.
+    match /usuarios/{userId} {
+      allow read: if isSignedIn();
+      // Bootstrap do próprio perfil após o login (sem poder se auto-promover a admin)
+      allow create: if isAdmin()
+        || (isSignedIn()
+            && request.auth.uid == userId
+            && incoming().perfil != 'admin'
+            && incoming().ativo == true);
+      // O usuário pode editar o próprio perfil, mas nunca trocar o próprio perfil/ativo;
+      // o admin pode editar qualquer usuário.
+      allow update: if isAdmin()
+        || (isSignedIn()
+            && request.auth.uid == userId
+            && incoming().perfil == existing().perfil
+            && incoming().ativo == existing().ativo);
+      allow delete: if isAdmin();
+    }
+
+    // --- interessados (Pessoas contatadas que ainda não iniciaram estudo) ---
+    match /interessados/{leadId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+        && isValidString(incoming().nome, 150)
+        && isValidString(incoming().whatsapp, 30);
+      allow update: if isSignedIn()
+        && isValidString(incoming().nome, 150);
+      allow delete: if isSignedIn();
+    }
+
+    // --- estudantes (Alunos com estudos bíblicos em andamento) ---
+    match /estudantes/{studentId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+        && isValidString(incoming().nome, 150);
+      allow update: if isSignedIn()
+        && isValidString(incoming().nome, 150);
+      allow delete: if isSignedIn();
+    }
+  }
+}

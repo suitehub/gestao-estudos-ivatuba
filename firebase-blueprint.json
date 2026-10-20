@@ -1,0 +1,129 @@
+{
+  "entities": {
+    "Lead": {
+      "title": "Lead",
+      "description": "Represents an interested person contacted in Ivatuba who has not yet started Bible studies",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "nome": { "type": "string" },
+        "endereco": { "type": "string" },
+        "whatsapp": { "type": "string" },
+        "origemContato": { "type": "string" },
+        "status": { 
+          "type": "string",
+          "enum": ["Registrado", "Mensagem enviada", "Mensagem de contato enviada", "Visita realizada", "Estudo aceito", "Estudo negado"]
+        },
+        "observacoes": { "type": "string" },
+        "dataContato": { "type": "string" },
+        "responsavelNome": { "type": "string" },
+        "responsavelId": { "type": "string" },
+        "igrejaId": { "type": "string" },
+        "igrejaNome": { "type": "string" },
+        "criadoEm": { "type": "string" },
+        "atualizadoEm": { "type": "string" },
+        "convertidoParaEstudo": { "type": "boolean" },
+        "estudanteId": { "type": "string" }
+      },
+      "required": ["nome", "whatsapp", "status", "igrejaId"]
+    },
+    "Student": {
+      "title": "Student",
+      "description": "Represents a student engaged in Bible study lessons in Ivatuba",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "nome": { "type": "string" },
+        "telefone": { "type": "string" },
+        "whatsapp": { "type": "string" },
+        "endereco": { "type": "string" },
+        "igrejaId": { "type": "string" },
+        "igrejaNome": { "type": "string" },
+        "distrito": { "type": "string" },
+        "instrutorIds": { 
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "instrutorNomes": { 
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "serieId": { "type": "string" },
+        "serieNome": { "type": "string" },
+        "estudoAtual": { "type": "number" },
+        "totalEstudos": { "type": "number" },
+        "porcentagem": { "type": "number" },
+        "faltantes": { "type": "number" },
+        "status": { 
+          "type": "string",
+          "enum": ["Ativo", "Pausado", "Desinteressado", "Concluído", "Pronto para apelo", "Pronto para batismo", "Batismo Realizado"]
+        },
+        "interesse": { 
+          "type": "string",
+          "enum": ["Alto", "Médio", "Baixo"]
+        },
+        "observacoes": { "type": "string" },
+        "ultimoContato": { "type": "string" },
+        "criadoEm": { "type": "string" },
+        "atualizadoEm": { "type": "string" },
+        "leadIdOrigem": { "type": "string" }
+      },
+      "required": ["nome", "status", "igrejaId", "serieId"]
+    },
+    "StudySeries": {
+      "title": "StudySeries",
+      "description": "Catalog of Bible study courses and lesson series",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "nome": { "type": "string" },
+        "totalEstudos": { "type": "number" },
+        "ativo": { "type": "boolean" },
+        "criadoEm": { "type": "string" },
+        "atualizadoEm": { "type": "string" }
+      },
+      "required": ["nome", "totalEstudos", "ativo"]
+    },
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User account and instructor profile in Ivatuba",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "nome": { "type": "string" },
+        "email": { "type": "string" },
+        "emailAuth": { "type": "string" },
+        "perfil": { 
+          "type": "string",
+          "enum": ["admin", "distrital", "local", "membro"]
+        },
+        "username": { "type": "string" },
+        "igrejaId": { "type": "string" },
+        "igrejaNome": { "type": "string" },
+        "distrito": { "type": "string" },
+        "ativo": { "type": "boolean" },
+        "criadoEm": { "type": "string" },
+        "atualizadoEm": { "type": "string" }
+      },
+      "required": ["nome", "perfil", "ativo", "igrejaId"]
+    }
+  },
+  "firestore": {
+    "/interessados/{leadId}": {
+      "schema": "Lead",
+      "description": "Collection of prospective contacts who have not yet started study"
+    },
+    "/estudantes/{studentId}": {
+      "schema": "Student",
+      "description": "Collection of active Bible study students"
+    },
+    "/series/{seriesId}": {
+      "schema": "StudySeries",
+      "description": "Catalog of available Bible study courses"
+    },
+    "/usuarios/{userId}": {
+      "schema": "UserProfile",
+      "description": "Collection of user accounts and instructors"
+    }
+  }
+}

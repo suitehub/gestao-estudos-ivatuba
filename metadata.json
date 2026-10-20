@@ -1,0 +1,6 @@
+{
+  "name": "Gestão de Estudos - Ivatuba",
+  "description": "Sistema de gestão de interessados, estudantes de estudos bíblicos e instrutores de Ivatuba.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
